@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Petualangan Napas Ajaib</title>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
+
+body{
+overflow:hidden;
+height:100vh;
+background:linear-gradient(to bottom,#87CEEB,#EAF8FF);
+text-align:center;
+}
+
+h1{
+margin-top:15px;
+color:#1f3d5a;
+}
+
+#levelTitle{
+font-size:28px;
+font-weight:bold;
+margin-top:10px;
+}
+
+#instruction{
+font-size:48px;
+font-weight:bold;
+margin-top:10px;
+height:70px;
+}
+
+#gameArea{
+position:relative;
+height:55vh;
+}
+
+#moon{
+position:absolute;
+top:20px;
+right:30px;
+font-size:90px;
+}
+
+#balloon{
+font-size:140px;
+margin-top:20px;
+transition:.1s;
+display:inline-block;
+}
+
+#rocket{
+position:absolute;
+left:50%;
+bottom:20px;
+transform:translateX(-50%);
+font-size:90px;
+transition:.2s;
+}
+
+.controls{
+margin-top:10px;
+}
+
+button{
+padding:12px 20px;
+margin:5px;
+border:none;
+border-radius:12px;
+font-size:20px;
+cursor:pointer;
+}
+
+.fast{background:#ff5252;color:white;}
+.medium{background:#ffd54f;}
+.slow{background:#66bb6a;color:white;}
+
+.start{background:#4caf50;color:white;}
+.pause{background:#ff9800;color:white;}
+.restart{background:#2196f3;color:white;}
+.full{background:#673ab7;color:white;}
+.mic{background:#e91e63;color:white;}
+
+#progressBox{
+width:80%;
+height:22px;
+margin:10px auto;
+background:white;
+border-radius:100px;
+overflow:hidden;
+}
+
+#progress{
+width:0%;
+height:100%;
+background:#4caf50;
+transition:.3s;
+}
+
+#breathBar{
+width:350px;
+height:30px;
+margin:15px auto;
+background:white;
+border-radius:20px;
+overflow:hidden;
+border:2px solid #ccc;
+}
+
+#breathLevel{
+width:0%;
+height:100%;
+background:linear-gradient(
+to right,
+#00e676,
+#ffee58,
+#ff1744
+);
+}
+
+#reward{
+display:none;
+position:fixed;
+inset:0;
+background:rgba(255,255,255,.95);
+justify-content:center;
+align-items:center;
+flex-direction:column;
+z-index:100;
+}
+
+#reward h2{
+font-size:70px;
+color:#ff9800;
+}
+
+#reward p{
+font-size:32px;
+}
+
+.star{
+position:absolute;
+font-size:30px;
+animation:fall linear forwards;
+pointer-events:none;
+}
+
+@keyframes fall{
+0%{
+transform:translateY(-50px);
+}
+100%{
+transform:translateY(110vh);
+}
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>🫁 PETUALANGAN NAPAS AJAIB</h1>
+
+<div id="levelTitle">
+Pilih Level Pernapasan
+</div>
+
+<div id="instruction">
+SIAP?
+</div>
+
+<div id="progressBox">
+<div id="progress"></div>
+</div>
+
+<div id="breathBar">
+<div id="breathLevel"></div>
+</div>
+
+<div id="gameArea">
+
+<div id="moon">🌙</div>
+
+<div id="balloon">
+🎈
+</div>
+
+<div id="rocket">
+🚀
+</div>
+
+</div>
+
+<div>
+
+<button class="fast"
+onclick="setLevel('fast')">
+🔴 Cepat
+</button>
+
+<button class="medium"
+onclick="setLevel('medium')">
+🟡 Sedang
+</button>
+
+<button class="slow"
+onclick="setLevel('slow')">
+🟢 Pelan
+</button>
+
+</div>
+
+<div class="controls">
+
+<button class="mic"
+onclick="enableMicrophone()">
+🎤 Mikrofon
+</button>
+
+<button class="start"
+onclick="startGame()">
+▶ Mulai
+</button>
+
+<button class="pause"
+onclick="pauseGame()">
+⏸ Jeda
+</button>
+
+<button class="restart"
+onclick="location.reload()">
+🔄 Ulangi
+</button>
+
+<button class="full"
+onclick="fullscreenGame()">
+⛶ Fullscreen
+</button>
+
+</div>
+
+<div id="reward">
+
+<h2>🏆 HEBAT! 🏆</h2>
+
+<p>Kamu berhasil menyelesaikan latihan napas.</p>
+
+<h1>⭐⭐⭐⭐ MASTER NAPAS ⭐⭐⭐⭐</h1>
+
+</div>
+
+<script>
+
+let audioContext;
+let analyser;
+let microphone;
+let dataArray;
+
+let micActive=false;
+
+let level="fast";
+let target=5;
+let successCount=0;
+
+let blowStart=null;
+let paused=false;
+let playing=false;
+
+function setLevel(type){
+
+level=type;
+
+successCount=0;
+updateProgress();
+
+if(type==="fast"){
+document.getElementById("levelTitle").innerHTML=
+"🔴 NAPAS CEPAT";
+}
+
+if(type==="medium"){
+document.getElementById("levelTitle").innerHTML=
+"🟡 NAPAS SEDANG";
+}
+
+if(type==="slow"){
+document.getElementById("levelTitle").innerHTML=
+"🟢 NAPAS PELAN";
+}
+
+}
+
+function startGame(){
+
+playing=true;
+
+document.getElementById("instruction")
+.innerHTML="💨 TIUP SEKARANG";
+
+}
+
+function pauseGame(){
+
+paused=!paused;
+
+if(paused){
+document.getElementById("instruction")
+.innerHTML="⏸ JEDA";
+}else{
+document.getElementById("instruction")
+.innerHTML="💨 LANJUTKAN";
+}
+
+}
+
+async function enableMicrophone(){
+
+try{
+
+const stream=
+await navigator.mediaDevices.getUserMedia({
+audio:true
+});
+
+audioContext=
+new (window.AudioContext ||
+window.webkitAudioContext)();
+
+analyser=
+audioContext.createAnalyser();
+
+analyser.fftSize=256;
+
+microphone=
+audioContext.createMediaStreamSource(stream);
+
+microphone.connect(analyser);
+
+dataArray=
+new Uint8Array(
+analyser.frequencyBinCount
+);
+
+micActive=true;
+
+document.getElementById("instruction")
+.innerHTML=
+"🎤 Mikrofon Aktif";
+
+detectBlowing();
+
+}catch(error){
+
+alert("Izinkan akses mikrofon.");
+
+}
+
+}
+
+function detectBlowing(){
+
+if(!micActive) return;
+
+analyser.getByteFrequencyData(dataArray);
+
+let volume=0;
+
+for(let i=0;i<dataArray.length;i++){
+
+volume+=dataArray[i];
+
+}
+
+volume=
+volume/dataArray.length;
+
+let percent=
+Math.min(volume*2,100);
+
+document.getElementById(
+"breathLevel"
+).style.width=
+percent+"%";
+
+let balloon=
+document.getElementById("balloon");
+
+let rocket=
+document.getElementById("rocket");
+
+let scale=
+1+(volume/80);
+
+scale=Math.min(scale,3);
+
+balloon.style.transform=
+`scale(${scale})`;
+
+if(
+playing &&
+!paused &&
+volume>25
+){
+
+if(blowStart===null){
+
+blowStart=Date.now();
+
+}
+
+let duration=
+(Date.now()-blowStart)/1000;
+
+checkSuccess(duration);
+
+}else{
+
+blowStart=null;
+
+}
+
+requestAnimationFrame(
+detectBlowing
+);
+
+}
+
+function checkSuccess(duration){
+
+if(level==="fast"){
+
+if(duration>0.2 &&
+duration<1){
+
+successAction();
+
+blowStart=null;
+
+}
+
+}
+
+if(level==="medium"){
+
+if(duration>=2){
+
+successAction();
+
+blowStart=null;
+
+}
+
+}
+
+if(level==="slow"){
+
+if(duration>=6){
+
+successAction();
+
+blowStart=null;
+
+}
+
+}
+
+}
+
+function successAction(){
+
+successCount++;
+
+let rocket=
+document.getElementById("rocket");
+
+rocket.style.bottom=
+(20+successCount*80)+"px";
+
+updateProgress();
+
+createMiniStars();
+
+document.getElementById("instruction")
+.innerHTML=
+"⭐ BERHASIL!";
+
+if(successCount>=target){
+
+finishGame();
+
+}
+
+}
+
+function updateProgress(){
+
+let percent=
+(successCount/target)*100;
+
+document.getElementById("progress")
+.style.width=
+percent+"%";
+
+}
+
+function finishGame(){
+
+document.getElementById("reward")
+.style.display="flex";
+
+createBigStarRain();
+
+}
+
+function createMiniStars(){
+
+for(let i=0;i<5;i++){
+
+let star=
+document.createElement("div");
+
+star.className="star";
+
+star.innerHTML="⭐";
+
+star.style.left=
+Math.random()*100+"vw";
+
+star.style.animationDuration=
+(2+Math.random()*2)+"s";
+
+document.body.appendChild(star);
+
+setTimeout(()=>{
+star.remove();
+},4000);
+
+}
+
+}
+
+function createBigStarRain(){
+
+for(let i=0;i<80;i++){
+
+let star=
+document.createElement("div");
+
+star.className="star";
+
+star.innerHTML="⭐";
+
+star.style.left=
+Math.random()*100+"vw";
+
+star.style.animationDuration=
+(3+Math.random()*3)+"s";
+
+document.body.appendChild(star);
+
+setTimeout(()=>{
+star.remove();
+},6000);
+
+}
+
+}
+
+function fullscreenGame(){
+
+if(document.documentElement.requestFullscreen){
+
+document.documentElement.requestFullscreen();
+
+}
+
+}
+
+</script>
+
+</body>
+</html>
